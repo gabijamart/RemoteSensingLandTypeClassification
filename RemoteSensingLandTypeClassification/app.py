@@ -2,11 +2,15 @@ import os
 import time
 from flask import Flask, render_template, request, jsonify, send_from_directory
 from sentinelhub import SHConfig, SentinelHubRequest, DataCollection, MimeType, BBox, CRS
-from PIL import Image
+from PIL import Image, ImageEnhance
 import numpy as np
 import subprocess
+import segmentation
+import base64
 
 app = Flask(__name__)
+
+dir_name = os.path.dirname(__file__)
 
 config = SHConfig()
 config.sh_client_id = "sh-eb88ec93-b4ea-42a9-aed9-49f0f98a2925"
@@ -86,10 +90,34 @@ def fetch_images():
         timestamp = int(time.time())
         image_name1 = f'true_color_image1_{timestamp}.tiff'
         image_name2 = f'true_color_image2_{timestamp}.tiff'
-        image_path1 = os.path.join('static', image_name1)
-        image_path2 = os.path.join('static', image_name2)
-        Image.fromarray(image1).save(image_path1)
-        Image.fromarray(image2).save(image_path2)
+        image_path1 = os.path.join(dir_name, 'static', image_name1)
+        image_path2 = os.path.join(dir_name, 'static', image_name2)
+
+        # Convert the numpy arrays to PIL images
+        img1 = Image.fromarray(image1).convert("RGB")
+        img2 = Image.fromarray(image2).convert("RGB")
+
+        # Enhance brightness
+        enhancer1 = ImageEnhance.Brightness(img1)
+        enhanced_img1 = enhancer1.enhance(1.5)  # Increase brightness by 1.5 times
+
+        enhancer2 = ImageEnhance.Brightness(img2)
+        enhanced_img2 = enhancer2.enhance(1.5)  # Increase brightness by 1.5 times
+
+        # Save the enhanced images
+        enhanced_img1.save(image_path1)
+        enhanced_img2.save(image_path2)
+
+        maskpath = segmentation.get_masks(image_path1, image_path2)
+
+        with open(maskpath, "rb") as image_file:
+            mask = base64.b64encode(image_file.read())
+
+        mask = mask.decode('utf-8')
+
+        encodedmask = 'data:image/jpg;base64,' + mask
+
+        print(encodedmask)
 
         if os.name == 'nt':  # for windows
             os.startfile(image_path1)
@@ -99,10 +127,10 @@ def fetch_images():
             subprocess.call(['open', image_path2])
 
         print(f"Images saved to {image_path1} and {image_path2}")
-        return jsonify({"message": "Images fetched successfully", "image_path1": image_name1, "image_path2": image_name2})
+        return jsonify({"message": "Images fetched successfully", "mask": encodedmask})
     except Exception as e:
-        print(f"Error fetching images: {str(e)}")
-        return jsonify({"message": "Error fetching images", "error": str(e)}), 500
+        print(f"Error fetching mask: {str(e)}")
+        return jsonify({"message": "Error fetching mask", "error": str(e)}), 500
 
 @app.route('/static/<path:path>')
 def send_static(path):

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Remote Sensing Land Type Classification</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        #map { height: 400px; }
+    </style>
+</head>
+<body>
+    <h1>Fetch Satellite Images</h1>
+    <form id="fetchForm">
+        <label for="lat_min">Latitude Min:</label>
+        <input type="text" id="lat_min" name="lat_min"><br><br>
+        <label for="lat_max">Latitude Max:</label>
+        <input type="text" id="lat_max" name="lat_max"><br><br>
+        <label for="lon_min">Longitude Min:</label>
+        <input type="text" id="lon_min" name="lon_min"><br><br>
+        <label for="lon_max">Longitude Max:</label>
+        <input type="text" id="lon_max" name="lon_max"><br><br>
+
+        <label for="date_start1">Start Date 1 (YYYY-MM-DD):</label>
+        <input type="text" id="date_start1" name="date_start1"><br><br>
+        <label for="date_end1">End Date 1 (YYYY-MM-DD):</label>
+        <input type="text" id="date_end1" name="date_end1"><br><br>
+
+        <label for="date_start2">Start Date 2 (YYYY-MM-DD):</label>
+        <input type="text" id="date_start2" name="date_start2"><br><br>
+        <label for="date_end2">End Date 2 (YYYY-MM-DD):</label>
+        <input type="text" id="date_end2" name="date_end2"><br><br>
+
+        <button type="button" onclick="fetchImages()">Fetch Images</button>
+    </form>
+    <div id="result"></div>
+
+    <div id="map"></div>
+    
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <!-- <script src="mask.geojson"></script> -->
+
+    <script>
+        var map = L.map('map').setView([51.505, -0.09], 13);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        function show_overlay(mask) {
+            var imageUrl = mask
+            var imageBounds = [[52.4, 13.3], [52.6, 13.6]]; // Define the bounds of the image overlay
+
+            L.imageOverlay(imageUrl, imageBounds).addTo(map);
+        }
+
+        function fetchImages() {
+            const data = {
+                lat_min: document.getElementById('lat_min').value,
+                lat_max: document.getElementById('lat_max').value,
+                lon_min: document.getElementById('lon_min').value,
+                lon_max: document.getElementById('lon_max').value,
+                date_start1: document.getElementById('date_start1').value,
+                date_end1: document.getElementById('date_end1').value,
+                date_start2: document.getElementById('date_start2').value,
+                date_end2: document.getElementById('date_end2').value
+            };
+
+            fetch('/fetch-images', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.mask) {
+                    show_overlay(data.mask)
+                } else {
+                    document.getElementById('result').innerHTML = 'Error: ' + data.message;
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+    </script>
+</body>
+</html>
